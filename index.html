@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reset Password - SAE Drill Log</title>
+<style>
+  :root { --bg:#f4f6f8; --card:#fff; --text:#1c2733; --muted:#5b6b7b; --accent:#1f5fbf; --err:#b3261e; --ok:#1b6e3c; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#12181f; --card:#1b242e; --text:#e8edf2; --muted:#9fb0c0; --accent:#6ea8ff; --err:#ff8a80; --ok:#7bd49a; } }
+  body { margin:0; background:var(--bg); color:var(--text); font:16px/1.5 system-ui,sans-serif; }
+  main { max-width:420px; margin:0 auto; padding:32px 16px; }
+  .card { background:var(--card); border-radius:12px; padding:24px; box-shadow:0 1px 4px rgba(0,0,0,.15); }
+  h1 { font-size:1.4rem; margin:0 0 4px; }
+  p.sub { color:var(--muted); margin:0 0 20px; }
+  label { display:block; font-weight:600; margin:14px 0 4px; }
+  input { width:100%; box-sizing:border-box; padding:12px; font-size:1rem; border:1px solid var(--muted); border-radius:8px; background:transparent; color:var(--text); }
+  button { width:100%; margin-top:20px; padding:14px; font-size:1.05rem; font-weight:600; border:0; border-radius:8px; background:var(--accent); color:#fff; cursor:pointer; }
+  button:disabled { opacity:.5; cursor:default; }
+  #msg { margin-top:16px; min-height:1.5em; }
+  .err { color:var(--err); } .ok { color:var(--ok); }
+</style>
+</head>
+<body>
+<main>
+  <div class="card">
+    <h1>SAE Drill Log</h1>
+    <p class="sub">Choose a new password for your account.</p>
+    <form id="form" hidden>
+      <label for="pw">New password</label>
+      <input id="pw" type="password" autocomplete="new-password" minlength="6" required>
+      <label for="pw2">Confirm new password</label>
+      <input id="pw2" type="password" autocomplete="new-password" minlength="6" required>
+      <button id="go" type="submit">Set password</button>
+    </form>
+    <div id="msg" role="status">Checking your reset link&hellip;</div>
+  </div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.0/dist/umd/supabase.min.js"></script>
+<script>
+  // The publishable key is public by design (it ships inside the Android app too); row-level security is the real boundary.
+  const sb = supabase.createClient("https://jdbjnbipgfkbqtqpfsih.supabase.co", "sb_publishable_2r7xsJU8ZdVdd1bhMkIYOg__NPOlBvy", { auth: { detectSessionInUrl: true, persistSession: false } });
+  const form = document.getElementById("form"), msg = document.getElementById("msg"), go = document.getElementById("go");
+  const say = (t, cls) => { msg.textContent = t; msg.className = cls || ""; };
+  let ready = false;
+
+  function showForm() { ready = true; form.hidden = false; say(""); }
+  sb.auth.onAuthStateChange((event) => { if (event === "PASSWORD_RECOVERY" && !ready) showForm(); });
+  setTimeout(async () => {
+    if (ready) return;
+    const { data } = await sb.auth.getSession();
+    if (data.session) showForm();
+    else say("This reset link is invalid or has expired. Ask your administrator to send a new one.", "err");
+  }, 2500);
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const pw = document.getElementById("pw").value, pw2 = document.getElementById("pw2").value;
+    if (pw !== pw2) { say("The two passwords don't match.", "err"); return; }
+    go.disabled = true; say("Saving…");
+    const { error } = await sb.auth.updateUser({ password: pw });
+    if (error) { go.disabled = false; say(error.message, "err"); return; }
+    form.hidden = true;
+    say("Your password has been changed. Open the SAE Drill Log app and sign in with your new password.", "ok");
+    sb.auth.signOut();
+  });
+</script>
+</body>
+</html>
